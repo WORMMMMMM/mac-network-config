@@ -1,0 +1,112 @@
+# Profiles Config for Clash Verge
+
+current: RhIrVLlJo3DA
+items:
+- uid: Merge
+  type: merge
+  name: null
+  file: Merge.yaml
+  updated: 1758170595
+- uid: Script
+  type: script
+  name: null
+  file: Script.js
+  updated: 1758170595
+- uid: muZPBVuUKmSy
+  type: merge
+  name: null
+  file: muZPBVuUKmSy.yaml
+  updated: 1763461291
+- uid: sP0ogP9S8KjM
+  type: script
+  name: null
+  file: sP0ogP9S8KjM.js
+  updated: 1763461291
+- uid: rrUL5etiVpFy
+  type: rules
+  name: null
+  file: rrUL5etiVpFy.yaml
+  updated: 1763461291
+- uid: pHKbWuoUwheE
+  type: proxies
+  name: null
+  file: pHKbWuoUwheE.yaml
+  updated: 1763461291
+- uid: gUozx6XAW71Y
+  type: groups
+  name: null
+  file: gUozx6XAW71Y.yaml
+  updated: 1763461291
+- uid: RxsUKRZ8Dp4y
+  type: remote
+  name: backup-airport.yaml
+  file: RxsUKRZ8Dp4y.yaml
+  url: 'https://<REDACTED-SUBSCRIPTION-URL>'
+  selected:
+  - name: GLOBAL
+    now: 🇺🇸 US-B1
+  - name: 🔔 Info
+    now: 'Website: wpku.org'
+  - name: 🚀 Accel.
+    now: 🇺🇸 美国静态IP
+  - name: ⛓️ 链式前置
+    now: 🇺🇸 US-B1
+  extra:
+    upload: 0
+    download: 0
+    total: 0
+    expire: 0
+  updated: 1792567976
+  option:
+    update_interval: 1440
+    allow_auto_update: true
+    merge: muZPBVuUKmSy
+    script: sP0ogP9S8KjM
+    rules: rrUL5etiVpFy
+    proxies: pHKbWuoUwheE
+    groups: gUozx6XAW71Y
+  home: 'https://<REDACTED-PROFILE-PAGE>'
+- uid: mLaxQxgKSfZy
+  type: merge
+  name: null
+  file: mLaxQxgKSfZy.yaml
+  updated: 1792571212
+- uid: swo2xLFu7o9w
+  type: script
+  name: null
+  file: swo2xLFu7o9w.js
+  updated: 1792571212
+- uid: rv7OL01G2cTB
+  type: rules
+  name: null
+  file: rv7OL01G2cTB.yaml
+  updated: 1792571212
+- uid: pwU57LWzG18a
+  type: proxies
+  name: null
+  file: pwU57LWzG18a.yaml
+  updated: 1792571212
+- uid: gOTbtbDO8LQU
+  type: groups
+  name: null
+  file: gOTbtbDO8LQU.yaml
+  updated: 1792571212
+- uid: RhIrVLlJo3DA
+  type: remote
+  name: 机场主组
+  file: RhIrVLlJo3DA.yaml
+  url: 'https://<REDACTED-SUBSCRIPTION-URL>'
+  extra:
+    upload: 0
+    download: 0
+    total: 0
+    expire: 0
+  updated: 1792571251
+  option:
+    update_interval: 1440
+    allow_auto_update: true
+    merge: muZPBVuUKmSy
+    script: sP0ogP9S8KjM
+    rules: rrUL5etiVpFy
+    proxies: pHKbWuoUwheE
+    groups: gUozx6XAW71Y

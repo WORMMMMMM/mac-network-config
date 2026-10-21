@@ -1,0 +1,123 @@
+# Mac 网络配置（Clash Verge TUN + 链式静态 IP）
+
+本仓库是 Mac 上「科学上网」配置的可复现归档：Clash Verge 的扩展脚本、规则、分组模板、网络自愈服务，以及踩过的坑。
+
+> **所有凭据均已脱敏**：静态代理的账号密码、订阅 URL、节点信息全部替换为占位符。复现时替换成你自己的即可。
+
+---
+
+## 一、架构
+
+```
+                            ┌──────────────── 应用层 ────────────────┐
+                            │ Claude Code / Codex / 浏览器 / CLI 工具  │
+                            └───────┬───────────────────┬────────────┘
+                    环境变量代理(可选) │                   │ 系统 TUN
+                                    ▼                   ▼
+┌─────────────────────────────── Clash Verge (TUN) ───────────────────────────────┐
+│  utun1024, fake-ip 198.18.0.0/16                                                │
+│                                                                                 │
+│  🤖 AI 出口 (fallback，仅 1 个成员 = fail-closed)                                │
+│     └─ 🇺🇸 美国静态IP (socks5) ──dialer-proxy──▶ ⛓️ 链式前置 (url-test)          │
+│                                    │               └─ 机场节点（自动选可用）    │
+│                                    ▼                                            │
+│                          <静态代理> ──▶ Anthropic / OpenAI                       │
+│                                                                                 │
+│  其他外网 ──▶ 机场主组 (select) ──▶ 自动选择 (url-test，排除香港/台湾) ──▶ 节点   │
+│  国内 ──▶ DIRECT                                                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 二、配置清单
+
+### 1. 系统网络层
+
+| 项目 | 值 |
+|---|---|
+| 代理工作模式 | **TUN 模式**（系统代理关闭），TUN 网卡 `utun1024`，stack = gvisor，MTU 1500 |
+| 假 IP 段 | `198.18.0.0/16`（IPv4）、`fdfe:dcba:9876::1/64`（IPv6） |
+| DNS | mihomo 内置 DNS（`dns-hijack: any:53`），使用**传统 UDP 上游**（不用 DoH） |
+| 分流路由 | `0/1`、`128/1` → TUN；国内/私有网段由更具体的系统路由直出 |
+
+### 2. Clash Verge
+
+- **版本**：2.5.8，内核 mihomo v1.19.32（`verge-mihomo`，非 alpha）
+- **订阅**：两个 profile（主用商业机场 / 备用校园机场），各自独立记住节点选择
+- **覆写文件**（两个 profile 共用同一套，脚本按订阅自带组自动适配）：
+  - `clash/script.js` — 核心扩展脚本
+  - `clash/rules.yaml` — AI 规则
+  - `clash/merge.yaml` — DNS / fake-ip 基础配置
+  - `clash/proxies-template.yaml`、`clash/groups-template.yaml` — 空模板（占位）
+
+### 3. 代理分组
+
+| 组 | 类型 | 说明 |
+|---|---|---|
+| `🤖 AI 出口` | fallback，**仅 1 个成员** | 只放 `🇺🇸 美国静态IP`，链路断则 AI 直接失败（fail-closed，绝不回落机场共享 IP） |
+| `🇺🇸 美国静态IP` | socks5 | 出口固定美国 IP；`dialer-proxy = ⛓️ 链式前置`（走机场中转） |
+| `⛓️ 链式前置` | url-test | 健康检查 = **节点→静态代理端口返回 407**（只有真正能承载链式的节点才入选） |
+| `<机场>` | select | 外网总入口，默认选 `自动选择` |
+| `自动选择` | url-test | **自动排除香港/台湾节点**及订阅信息节点，取最快 |
+| `故障转移` | fallback | 同上过滤 |
+
+### 4. 规则优先级（自上而下）
+
+```
+1.  AND,((NETWORK,UDP),(DST-PORT,443)),REJECT      # 全局禁 QUIC，防绕过域名规则
+2.  anthropic.com / claude.ai / claudeusercontent.com /
+    openai.com / chatgpt.com / oaistatic.com        → 🤖 AI 出口
+3.  accounts.google.com / myaccount.google.com / oauth2.googleapis.com /
+    account.google.com / aistudio.google.com / accounts.youtube.com → 🤖 AI 出口
+4.  订阅自带规则（YouTube/Google 等 → 机场组；广告 → REJECT）
+5.  GEOIP,CN → DIRECT
+6.  MATCH → 机场组                                   # 兜底
+```
+
+### 5. 三层 fail-closed（防止 AI 流量走错出口）
+
+| 层 | 机制 |
+|---|---|
+| 配置层 | AI 域名 → `🤖 AI 出口`（单成员静态 IP）；`MATCH` 不为 DIRECT；全局 REJECT UDP:443 |
+| 环境变量层 | `~/.claude/settings.json` 的 `env` + `~/.zshrc` 的 `HTTP(S)_PROXY`（见 `claude/`、`shell/`） |
+| 传输层 | 静态 IP 节点固定 `dialer-proxy`，链路断开即失败，不会静默改走其它出口 |
+
+### 6. 后台服务（自愈）
+
+| 服务 | 触发 | 作用 |
+|---|---|---|
+| `com.ziming.netguard`（LaunchAgent） | 每 30s | 探测外网（国内 DoH 锚点 TCP 443），**连续 3 次失败自动重启 Clash**（治"换网后 Clash 抽风"） |
+
+### 7. 常用命令
+
+```bash
+tail -f ~/Library/Logs/netguard.log       # 网络自愈日志
+pgrep -fl verge-mihomo                    # Clash 内核
+```
+
+---
+
+## 三、目录结构
+
+```
+clash/     Clash Verge 覆写：script.js / rules.yaml / merge.yaml / 模板 / profiles 示例
+launchd/   netguard 网络自愈（plist + 脚本）
+shell/     环境变量代理片段（zsh）
+claude/    Claude Code 的 settings.json env 示例
+docs/      ARCHITECTURE.md（架构细节）/ TROUBLESHOOTING.md（故障排查手册）
+```
+
+## 四、复现步骤（概要）
+
+1. 安装 Clash Verge Rev，开启 TUN 模式（gvisor）。
+2. 添加订阅 profile；把 `clash/` 下的 `script.js`、`rules.yaml`、`merge.yaml` 挂到 profile 的 option（script / rules / merge）。
+3. 把 `clash/script.js` 里的 `STATIC_NODE` 换成你自己的静态代理（IP / 端口 / 账号 / 密码），或删掉该节点与相关规则。
+4. 按需安装 `launchd/com.ziming.netguard.plist`（路径改成你的用户名）。
+5. `claude/settings.example.json` → `~/.claude/settings.json`（只保留你需要的内容）。
+
+## 五、安全说明
+
+- 本仓库**不含**任何订阅 URL、机场节点、静态代理账号密码等敏感信息。
+- 提交前已用关键字扫描（机场域名、token、账号、IP 片段）确认无残留。
+- 建议保持仓库为 **private**。
