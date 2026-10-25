@@ -63,6 +63,31 @@ re-creating the http client due to requesting https://223.5.5.5:443/dns-query: c
 | 节点是纯 IPv6 | 节点 server 是 `2605:...` 等 IPv6 地址 | 本机有公网 IPv6 才能用；否则换 IPv4 节点 |
 | 静态代理服务端白名单/限流 | 经节点访问静态代理端口，返回 407 才算通 | 联系服务商或换前置节点 |
 
+### 6. WebRTC 把真实公网 IP 暴露了（HTTP 走代理，STUN 却直连）
+
+**症状**：用 https://ip.cx/webrtc 这类页面检测，`HTTP 可见地址` 是代理出口，`WebRTC 公网地址` 却是自己的真实 IP。
+
+**原因**：
+
+1. Chromium 系客户端（Claude Desktop、浏览器）在创建 `RTCPeerConnection` 时，会向 STUN 服务器发 UDP 探测；
+2. 国内 STUN 服务器（`stun.chat.bilibili.com:3478`、ip.cx 国内节点等）命中 `GEOIP,CN → DIRECT`；
+3. 这些 UDP 从真实网卡直接发出，STUN 服务器因此看到真实公网 IP；
+4. 关键：**只封 19302 不够**，实测 8 台 STUN 服务器里有 7 台走 **3478**。
+
+**处理**（规则最顶部）：
+
+```
+- AND,((NETWORK,UDP),(DST-PORT,19302)),REJECT
+- AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT
+- AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT
+```
+
+改完重启 Clash，再跑一次 ip.cx/webrtc：`WebRTC 公网地址` 应显示"未探测到"，`内网地址` 只剩 mDNS 随机名（`xxx.local`）。
+
+**代价**：3478/5349 也用于视频通话 P2P 打洞，可能让 Meet/Teams/飞书降级走 TURN。异常时按 5349 → 3478 移除，19302 保留。
+
+**补充**：Claude Code CLI 没有 WebRTC；有风险的是桌面客户端和浏览器。桌面端只在**语音模式 / 屏幕共享 / 内置网页**等场景才会创建 WebRTC 会话，纯文字聊天不会触发。
+
 ---
 
 ## 附：2026-10-21 链式代理排查复盘

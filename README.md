@@ -65,15 +65,35 @@
 ### 4. 规则优先级（自上而下）
 
 ```
-1.  AND,((NETWORK,UDP),(DST-PORT,443)),REJECT      # 全局禁 QUIC，防绕过域名规则
-2.  anthropic.com / claude.ai / claudeusercontent.com /
+1.  AND,((NETWORK,UDP),(DST-PORT,19302)),REJECT    # WebRTC：Google STUN
+2.  AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT     # WebRTC：标准 STUN/TURN
+3.  AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT     # WebRTC：STUN/TURN over TLS
+4.  AND,((NETWORK,UDP),(DST-PORT,443)),REJECT      # 全局禁 QUIC，防绕过域名规则
+5.  anthropic.com / claude.ai / claudeusercontent.com /
     openai.com / chatgpt.com / oaistatic.com        → 🤖 AI 出口
-3.  accounts.google.com / myaccount.google.com / oauth2.googleapis.com /
+6.  accounts.google.com / myaccount.google.com / oauth2.googleapis.com /
     account.google.com / aistudio.google.com / accounts.youtube.com → 🤖 AI 出口
-4.  订阅自带规则（YouTube/Google 等 → 机场组；广告 → REJECT）
-5.  GEOIP,CN → DIRECT
-6.  MATCH → 机场组                                   # 兜底
+7.  订阅自带规则（YouTube/Google 等 → 机场组；广告 → REJECT）
+8.  GEOIP,CN → DIRECT
+9.  MATCH → 机场组                                   # 兜底
 ```
+
+### 4.1 WebRTC / STUN 防泄漏
+
+Chromium 系客户端（**Claude Desktop、浏览器**）会通过 WebRTC 向 STUN 服务器发 UDP 探测，拿到自己的公网出口地址。问题在于：
+
+- 国内 STUN 服务器（如 `stun.chat.bilibili.com:3478`）会被 `GEOIP,CN → DIRECT` 判定为直连；
+- 这些 UDP 包**从真实网卡直接发出**，STUN 服务器因此看到真实公网 IP；
+- 结果：HTTP 走代理（出口 IP 正确），WebRTC 却把真实 IP 暴露出去。
+
+**修复**：在规则最顶部直接 `REJECT` 三个 STUN 端口。实测（https://ip.cx/webrtc）：
+
+| | HTTP 可见地址 | WebRTC 公网地址 |
+|---|---|---|
+| 修复前 | 代理出口 IP ✓ | **真实公网 IP** ✗ |
+| 修复后 | 代理出口 IP ✓ | 未探测到 ✓ |
+
+**代价**：3478/5349 也用于视频通话 P2P 打洞，可能让 Meet/Teams/飞书降级走 TURN 中继。如遇异常，按 5349 → 3478 的顺序移除，**19302 建议保留**。
 
 ### 5. 三层 fail-closed（防止 AI 流量走错出口）
 

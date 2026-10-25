@@ -27,6 +27,7 @@ mihomo 收到连接后：
 
 - AI 组是 **fallback 且只有一个成员**：链路异常时连接直接失败，不会回落到机场共享 IP。
 - 规则表首行 `AND,((NETWORK,UDP),(DST-PORT,443)),REJECT`：全局拦截 QUIC，防止应用用 HTTP/3 绕过域名规则。
+- 规则表顶部另有三条 STUN 拦截（`19302` / `3478` / `5349`）：防止 WebRTC 向 STUN 服务器探测时把真实公网 IP 从 DIRECT 链路泄漏出去（详见 README 4.1 与 TROUBLESHOOTING 第 6 节）。
 - 兜底 `MATCH` 指向机场组（不是 DIRECT），IPv6/杂项流量也不会直连泄漏。
 - 环境变量层再兜一层（`~/.claude/settings.json` + `~/.zshrc`）。
 

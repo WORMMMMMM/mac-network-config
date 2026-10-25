@@ -1,5 +1,13 @@
-# 规则追加（AI 流量固定出口）。站点自有规则（私有网段 / 校园网）请自行在其下追加。
+# 规则追加（AI 流量固定出口 + WebRTC 防泄漏）。站点自有规则（私有网段 / 校园网）请自行在其下追加。
 prepend:
+  # 2026-10-24：屏蔽 WebRTC / STUN，防止真实公网 IP 经 Chromium 系客户端
+  # （Claude Desktop、浏览器等）泄漏：WebRTC 会向 STUN 服务器发 UDP 探测，
+  # 而国内 STUN 服务器命中的是 GEOIP,CN → DIRECT，包从真实网卡直接出去。
+  # 实测：只封 19302 不够，8 台测试服务器里 7 台走 3478。
+  # 若视频通话异常：先删 5349，再删 3478；19302 建议保留。
+  - 'AND,((NETWORK,UDP),(DST-PORT,19302)),REJECT'
+  - 'AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT'
+  - 'AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT'
   - 'DOMAIN-SUFFIX,anthropic.com,🤖 AI 出口'
   - 'DOMAIN-SUFFIX,claude.ai,🤖 AI 出口'
   - 'DOMAIN-SUFFIX,claudeusercontent.com,🤖 AI 出口'
