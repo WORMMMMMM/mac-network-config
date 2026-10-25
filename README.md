@@ -141,3 +141,8 @@ docs/      ARCHITECTURE.md（架构细节）/ TROUBLESHOOTING.md（故障排查�
 - 本仓库**不含**任何订阅 URL、机场节点、静态代理账号密码等敏感信息。
 - 提交前已用关键字扫描（机场域名、token、账号、IP 片段）确认无残留。
 - 建议保持仓库为 **private**。
+
+## 六、License
+
+[MIT](./LICENSE) © 2026 WORMMMMMM
+
