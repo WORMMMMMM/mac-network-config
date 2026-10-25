@@ -107,7 +107,7 @@ Chromium 系客户端（**Claude Desktop、浏览器**）会通过 WebRTC 向 ST
 
 | 服务 | 触发 | 作用 |
 |---|---|---|
-| `com.ziming.netguard`（LaunchAgent） | 每 30s | 探测外网（国内 DoH 锚点 TCP 443），**连续 3 次失败自动重启 Clash**（治"换网后 Clash 抽风"） |
+| `com.example.netguard`（LaunchAgent） | 每 30s | 探测外网（国内 DoH 锚点 TCP 443），**连续 3 次失败自动重启 Clash**（治"换网后 Clash 抽风"） |
 
 ### 7. 常用命令
 
@@ -133,7 +133,7 @@ docs/      ARCHITECTURE.md（架构细节）/ TROUBLESHOOTING.md（故障排查�
 1. 安装 Clash Verge Rev，开启 TUN 模式（gvisor）。
 2. 添加订阅 profile；把 `clash/` 下的 `script.js`、`rules.yaml`、`merge.yaml` 挂到 profile 的 option（script / rules / merge）。
 3. 把 `clash/script.js` 里的 `STATIC_NODE` 换成你自己的静态代理（IP / 端口 / 账号 / 密码），或删掉该节点与相关规则。
-4. 按需安装 `launchd/com.ziming.netguard.plist`（路径改成你的用户名）。
+4. 按需安装 `launchd/com.example.netguard.plist`（路径改成你的用户名）。
 5. `claude/settings.example.json` → `~/.claude/settings.json`（只保留你需要的内容）。
 
 ## 五、安全说明

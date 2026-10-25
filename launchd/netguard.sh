@@ -1,6 +1,6 @@
 #!/opt/homebrew/bin/bash
 # 上网体检员（netguard）：本机网络在、但外网不通（换网后 Clash 未重新接管 DNS/路由的经典抽风）
-# → 抓现场快照 → 自动重启 Clash Verge。由 LaunchAgent（com.ziming.netguard）每 30 秒唤起。
+# → 抓现场快照 → 自动重启 Clash Verge。由 LaunchAgent（com.example.netguard）每 30 秒唤起。
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 BASE="$HOME/.netguard"
