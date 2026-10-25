@@ -88,6 +88,41 @@ re-creating the http client due to requesting https://223.5.5.5:443/dns-query: c
 
 **补充**：Claude Code CLI 没有 WebRTC；有风险的是桌面客户端和浏览器。桌面端只在**语音模式 / 屏幕共享 / 内置网页**等场景才会创建 WebRTC 会话，纯文字聊天不会触发。
 
+### 7. Clash 重启后 Claude 掉线 / 被杀（这是设计行为）
+
+**现象**：
+
+- macOS：重启 Clash 后 Claude 进程消失，`/var/log/claude-guard.log` 出现 `proxy gone -> kill Claude PIDs: ...`；
+- Windows：重启 Clash 期间 Claude 请求报连接错误；如果没做系统代理，Claude Desktop 恢复后仍连不上。
+
+**原因**：fail-closed 的设计就是"代理不在 → Claude 不许工作"：
+
+1. L3（pf / 防火墙）在内核层丢弃所有直连 Anthropic IP 段的流量；
+2. L4（`claude-guard`）检测到 7897 端口消失超过 0.5 秒，直接杀掉 Claude 进程，避免它重试直连。
+
+**处理**：
+
+- 这是预期行为，Clash 恢复后重新打开 Claude 即可；
+- **重启 Clash 前先确认没有活跃的远程会话**（`claude remote-control`、`/rc` 的 Discord/Telegram 会话），否则会一并断掉；
+- Windows 上确认**系统代理**指向 `127.0.0.1:7897`，否则 Claude Desktop（Electron）会被 L3 拦住：
+
+  ```powershell
+  # 查看
+  Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" |
+      Select-Object ProxyEnable, ProxyServer
+  ```
+
+**临时解除**（不推荐，会失去保护）：
+
+```bash
+# macOS
+sudo pfctl -a claude-lock -F rules        # 清空锚点规则
+sudo launchctl bootout system /Library/LaunchDaemons/com.claude.guard.plist
+
+# Windows（管理员）
+Remove-NetFirewallRule -DisplayName "Claude fail-closed*"
+```
+
 ---
 
 ## 附：2026-10-21 链式代理排查复盘

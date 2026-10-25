@@ -31,6 +31,16 @@ mihomo 收到连接后：
 - 兜底 `MATCH` 指向机场组（不是 DIRECT），IPv6/杂项流量也不会直连泄漏。
 - 环境变量层再兜一层（`~/.claude/settings.json` + `~/.zshrc`）。
 
+**但以上都是"mihomo 运行中"才成立。** Clash 重启/崩溃时规则不存在，走 TUN 的流量会回落直连，必须靠系统级封锁兜底：
+
+| 层 | 位置 | 作用 |
+|---|---|---|
+| L3 内核封锁 | macOS `pf` 锚点 `claude-lock` / Windows 防火墙出站 Block | 直连 Anthropic 官方 IP 段（`160.79.104.0/21`、`2607:6bc0::/48`）直接丢包，与代理状态无关 |
+| L4 进程守护 | macOS `com.claude.guard`（LaunchDaemon） | 本地代理端口消失 >0.5s → 强杀 Claude 进程，避免它反复重试直连 |
+
+macOS 实现在 `ggllzz04/macos-claude-failclosed`；Windows 等价脚本见仓库 `windows/`。
+Windows 上 Claude Desktop 走系统代理，需把系统代理指向 `127.0.0.1:7897` 才能穿过 L3。
+
 ### 2.3 DNS
 
 ```

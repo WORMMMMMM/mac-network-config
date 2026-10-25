@@ -95,13 +95,30 @@ Chromium 系客户端（**Claude Desktop、浏览器**）会通过 WebRTC 向 ST
 
 **代价**：3478/5349 也用于视频通话 P2P 打洞，可能让 Meet/Teams/飞书降级走 TURN 中继。如遇异常，按 5349 → 3478 的顺序移除，**19302 建议保留**。
 
-### 5. 三层 fail-closed（防止 AI 流量走错出口）
+### 5. fail-closed：四层防护（防止 AI 流量走错出口）
 
-| 层 | 机制 |
-|---|---|
-| 配置层 | AI 域名 → `🤖 AI 出口`（单成员静态 IP）；`MATCH` 不为 DIRECT；全局 REJECT UDP:443 |
-| 环境变量层 | `~/.claude/settings.json` 的 `env` + `~/.zshrc` 的 `HTTP(S)_PROXY`（见 `claude/`、`shell/`） |
-| 传输层 | 静态 IP 节点固定 `dialer-proxy`，链路断开即失败，不会静默改走其它出口 |
+只靠"代理设置"是**路由**，不是**强制**——代理挂掉/重启的窗口期，流量会静默回落到直连。
+所以按"越往下越硬"堆了四层：
+
+| 层 | 机制 | 生效前提 | 实现 |
+|---|---|---|---|
+| **L1 规则** | AI 域名 → `🤖 AI 出口`（单成员静态 IP）；`MATCH` 不为 DIRECT；REJECT UDP 443 / STUN | mihomo 运行中 | `clash/rules.yaml` + `script.js` |
+| **L2 程序代理** | Claude Code 的 `settings.json` `env`、`.zshrc` 的 `HTTP(S)_PROXY` | 程序读取代理变量 | `claude/`、`shell/` |
+| **L3 内核封锁** | 直接丢弃到 Anthropic 官方 IP 段（`160.79.104.0/21`、`2607:6bc0::/48`）的出站连接 | 无（系统级，代理挂了也生效） | macOS：`pf` 锚点 / Windows：防火墙出站 Block |
+| **L4 进程守护** | 本地代理端口消失 >0.5s → 强杀 Claude 进程并通知 | 无 | macOS：`claude-guard.sh` + LaunchDaemon |
+
+> **L3 才是真正的保证**：代理的出口在远端节点上，本地不会直连 Anthropic，所以封锁这段 IP 不影响正常使用；只有"绕过代理的直连"会被丢包——包括 Clash 重启的那几十秒。
+
+**macOS 实现**（已在使用）：[ggllzz04/macos-claude-failclosed](https://github.com/ggllzz04/macos-claude-failclosed)
+—— `pf` 锚点 + `com.claude.guard` / `com.claude.pflock` 两个 LaunchDaemon。日志在 `/var/log/claude-guard.log`，代理消失时会看到：
+
+```
+2026-10-25 14:27:11 proxy gone -> kill Claude PIDs: 4592 93297 ...
+2026-10-25 14:27:18 proxy back up
+```
+
+**Windows 实现**：见 [`windows/anthropic-failclosed.ps1`](./windows/anthropic-failclosed.ps1)（防火墙出站 Block，等价于 pf；回滚脚本在同一目录）。
+注意：Windows 上 Claude Desktop（Electron）默认走系统代理，需把系统代理指向 `127.0.0.1:7897`，否则会被 L3 按设计拦住。
 
 ### 6. 后台服务（自愈）
 
@@ -123,6 +140,7 @@ pgrep -fl verge-mihomo                    # Clash 内核
 ```
 clash/     Clash Verge 覆写：script.js / rules.yaml / merge.yaml / 模板 / profiles 示例
 launchd/   netguard 网络自愈（plist + 脚本）
+windows/   Windows 版 fail-closed（防火墙 Block + 回滚脚本）
 shell/     环境变量代理片段（zsh）
 claude/    Claude Code 的 settings.json env 示例
 docs/      ARCHITECTURE.md（架构细节）/ TROUBLESHOOTING.md（故障排查手册）
