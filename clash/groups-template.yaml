@@ -1,6 +1,23 @@
-# Profile Enhancement Groups Template for Clash Verge
+# Clash Verge「代理组」增强模板（Profile Enhancement Groups Template）
+#
+# 放在 Clash Verge 的 groups 类型 profile 里（设置 → 配置 → 代理组）。
+# 与 rules.yaml 配合使用：rules 里引用这里的组名。
+#
+# 为什么需要它：Clash Verge 的 merge profile 只管 dns/hosts 等顶层配置，
+# 新增代理组要写在 groups profile 里，否则会被订阅配置覆盖掉。
 
-prepend: []
+prepend:
+  # 2026-11-13: Steam 专用出口。
+  # 起因：Steam 结算页（checkout.steampowered.com）报 Error -100，支付宝/微信都失败。
+  # 排查结论：链路本身通的，是「美区节点 + 国区账号 + 人民币支付」触发了 Steam 支付风控。
+  # 换成日本节点后正常。
+  #
+  # include-all-proxies + filter 的写法不会因为订阅更新改节点名而失效，
+  # 比把节点名硬编码进 proxies 列表更稳。
+  - name: 🎮 Steam
+    type: select
+    include-all-proxies: true
+    filter: "(?i)(日本|JP)"
 
 append: []
 

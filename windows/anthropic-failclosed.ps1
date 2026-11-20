@@ -10,30 +10,45 @@
 # 崩溃或被关掉的窗口期，走 TUN 的程序会回落直连，真实 IP 就暴露给 Anthropic。
 # 这条 Block 规则是那段时间里唯一还生效的东西。
 #
+# 为什么用 netsh 而不是 New-NetFirewallRule：
+# 在部分机器上（实测 Windows 11 + 中文系统）New-NetFirewallRule 会"假成功"——
+# 返回规则对象、脚本不报错，但规则几秒后消失，netsh 查询不到，流量也不被拦。
+# netsh advfirewall 的方式在这些机器上稳定生效。
+#
 # 回滚：windows/anthropic-failclosed-rollback.ps1
 
 $ErrorActionPreference = "Stop"
 
-$ranges = [ordered]@{
-    "IPv4" = "160.79.104.0/21"      # Anthropic 公布出站段（含入站 /23 的超集）
-    "IPv6" = "2607:6bc0::/48"       # Anthropic IPv6
+$principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Error "需要管理员权限。请以管理员身份运行 PowerShell 再执行本脚本。"
+    exit 1
 }
 
-foreach ($family in $ranges.Keys) {
-    $name = "Claude fail-closed: block direct Anthropic $family"
-    Remove-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
-    New-NetFirewallRule -DisplayName $name `
-        -Direction Outbound -Action Block `
-        -RemoteAddress $ranges[$family] -Profile Any `
-        -Description "Fail-closed: Anthropic traffic must go through the local proxy; direct connections are dropped." | Out-Null
-    Write-Host "已添加规则: $name -> $($ranges[$family])"
+$rules = [ordered]@{
+    "Claude fail-closed IPv4" = "160.79.104.0/21"   # Anthropic 公布出站段（含入站 /23 的超集）
+    "Claude fail-closed IPv6" = "2607:6bc0::/48"    # Anthropic IPv6
+}
+
+foreach ($name in $rules.Keys) {
+    $range = $rules[$name]
+    & netsh advfirewall firewall delete rule "name=$name" | Out-Null
+    & netsh advfirewall firewall add rule "name=$name" "dir=out" "action=block" `
+        "remoteip=$range" "enable=yes" `
+        "description=Fail-closed: Anthropic traffic must go through the local proxy; direct connections are dropped." | Out-Null
+    Write-Host "已添加规则: $name -> $range"
 }
 
 Write-Host ""
 Write-Host "当前规则状态:"
-Get-NetFirewallRule -DisplayName "Claude fail-closed*" |
-    Select-Object DisplayName, Enabled, Direction, Action |
-    Format-Table -AutoSize
+foreach ($name in $rules.Keys) {
+    & netsh advfirewall firewall show rule "name=$name" | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  [OK] $name -> $($rules[$name])"
+    } else {
+        Write-Host "  [缺失] $name"
+    }
+}
 
 Write-Host ""
 Write-Host "注意：Claude Desktop（Electron）默认走系统代理。请把系统代理指向 127.0.0.1:7897，"

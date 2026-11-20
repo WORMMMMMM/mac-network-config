@@ -49,7 +49,8 @@
   - `clash/script.js` — 核心扩展脚本
   - `clash/rules.yaml` — AI 规则
   - `clash/merge.yaml` — DNS / fake-ip 基础配置
-  - `clash/proxies-template.yaml`、`clash/groups-template.yaml` — 空模板（占位）
+  - `clash/groups-template.yaml` — 自定义代理组（`🎮 Steam`：日本节点组，避开 Steam 支付风控）
+  - `clash/proxies-template.yaml` — 空模板（占位）
 
 ### 3. 代理分组
 
@@ -61,6 +62,7 @@
 | `<机场>` | select | 外网总入口，默认选 `自动选择` |
 | `自动选择` | url-test | **自动排除香港/台湾节点**及订阅信息节点，取最快 |
 | `故障转移` | fallback | 同上过滤 |
+| `🎮 Steam` | select | 仅收录日本节点；Steam 商店/结算/社区专用，避开美区节点触发的支付风控（Error -100） |
 
 ### 4. 规则优先级（自上而下）
 

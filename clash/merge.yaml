@@ -8,3 +8,9 @@ dns:
   fake-ip-range6: fdfe:dcba:9876::1/64
   fake-ip-filter:
     - "+.local"
+  # 2026-11-15: 境外域名解析改走远端 DoH，消除「IP 在新加坡、DNS 在中国」的指纹漏点。
+  # 国内域名仍走国内 DNS，保证国内 CDN（如 360buyimg / hdslb）返回就近边缘节点，不变慢。
+  nameserver-policy:
+    "geosite:geolocation-!cn":
+      - https://1.1.1.1/dns-query
+      - https://dns.google/dns-query
